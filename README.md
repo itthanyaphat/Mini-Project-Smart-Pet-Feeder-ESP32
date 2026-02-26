@@ -51,7 +51,7 @@
 1. โคลน (Clone) หรือดาวน์โหลดโปรเจกต์นี้ลงเครื่อง
 2. เปิดไฟล์ `.ino` ด้วย Arduino IDE และ index.html
 3. แก้ไขข้อมูลในส่วนของการตั้งค่าให้เป็นของคุณเอง:
-   * `API_KEY` และ `DATABASE_URL` (สำหรับ Firebase ใน .ino, index.html)
+   * `API_KEY` และ `DATABASE_URL` (สำหรับ Firebase RealTime Database ใน .ino, index.html)
    * `BOT_TOKEN` และ `CHAT_ID` (สำหรับ Telegram ใน .ino)
 4. อัปโหลดโค้ดลงบอร์ด ESP32
 5. เมื่อบอร์ดเปิดขึ้นครั้งแรก ให้เชื่อมต่อ WiFi ชื่อ **SmartFeeder_Setup** (รหัสผ่าน: `12345678`) เพื่อตั้งค่าเครือข่ายอินเทอร์เน็ตให้บอร์ด
