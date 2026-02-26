@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Pet Feeder </title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-auth-compat.js"></script>
+
+    <style>
+        body { font-family: 'Kanit', sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); margin: 0; padding: 20px; color: #333; }
+        h1 { color: #2c3e50; margin-bottom: 20px; text-align: center; font-weight: 600; }
+
+        /* จัด Layout หลัก แบ่งซ้าย-ขวา */
+        .main-layout { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1400px; margin: 0 auto; align-items: stretch; }
+        
+        /* คอลัมน์ซ้าย: แผงควบคุม (กว้างคงที่) */
+        .left-col { flex: 0 0 420px; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* คอลัมน์ขวา: กราฟ (ขยายเต็มพื้นที่ที่เหลือ) */
+        .right-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+        /* Dashboard Cards */
+        .dashboard { display: flex; justify-content: space-between; gap: 10px; }
+        .card { background: white; padding: 15px 10px; border-radius: 15px; flex: 1; box-shadow: 0 5px 15px rgba(0,0,0,0.05); text-align: center; transition: transform 0.3s; }
+        .card:hover { transform: translateY(-3px); }
+        .card h3 { margin-top: 0; color: #7f8c8d; font-size: 14px; margin-bottom: 10px;}
+        .card .value { font-size: 26px; font-weight: bold; color: #2c3e50; margin: 5px 0 0 0; }
+
+        /* ถังอาหาร */
+        .tank-container { width: 60px; height: 90px; border: 3px solid #bdc3c7; border-radius: 5px 5px 15px 15px; position: relative; margin: 5px auto 0 auto; background: #ecf0f1; overflow: hidden; }
+        .tank-level { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: #f1c40f; transition: height 0.8s, background-color 0.5s; }
+        .tank-text { position: absolute; width: 100%; top: 50%; transform: translateY(-50%); font-size: 16px; font-weight: bold; color: #2c3e50; z-index: 2; text-shadow: 1px 1px 2px rgba(255,255,255,0.8); }
+
+        /* แผง Panel ตั้งค่าต่างๆ */
+        .panel { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); text-align: center; }
+        .panel h2, .panel h3 { margin-top: 0; color: #2c3e50; font-size: 18px; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        
+        .controls-grid { display: flex; flex-direction: column; gap: 15px; }
+        .control-box { border: 1px solid #eee; padding: 15px; border-radius: 10px; background: #fdfdfd; }
+        .control-box h3 { font-size: 16px; border: none; padding: 0; margin-bottom: 10px; color: #34495e; }
+
+        /* ปุ่มและ Input */
+        .btn { padding: 12px; font-size: 14px; font-family: 'Kanit', sans-serif; cursor: pointer; border: none; border-radius: 8px; color: white; margin: 5px 0; transition: 0.3s; font-weight: 600; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        .disabled { opacity: 0.4; pointer-events: none; box-shadow: none; }
+        
+        .btn-green { background: #2ed573; }
+        .btn-blue { background: #1e90ff; }
+        .btn-red { background: #ff4757; }
+        .btn-orange { background: #ffa502; }
+        .btn-pink { background: #ff6b81; }
+
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 14px; }
+        input { width: 60px; padding: 6px; border: 1px solid #ccc; border-radius: 5px; text-align: center; font-family: 'Kanit', sans-serif; }
+        
+        /* พัดลมหมุน */
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
+        #fanStatus { font-size: 32px; display: none; margin: 5px auto; }
+
+        /* ====== ตั้งค่าโซนกราฟ (เพิ่ม Scrollbar) ====== */
+        .chart-container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); flex: 1; display: flex; flex-direction: column; }
+        
+        /* สร้างกรอบให้เลื่อนเฉพาะแกน X */
+        .chart-scroll-area {
+            width: 100%;
+            overflow-x: auto; 
+            overflow-y: hidden;
+            flex: 1; /* ขยายให้เต็มความสูงที่เหลือ */
+            padding-bottom: 10px; /* เว้นที่ให้ scrollbar */
+        }
+
+        /* บังคับความกว้างขั้นต่ำ เพื่อให้ยาวทะลุกรอบและเลื่อนได้ */
+        .chart-wrapper { position: relative; width: 100%; height: 500px; min-width: 1200px; }
+
+        /* Scrollbar สวยๆ (รองรับ Chrome/Safari/Edge) */
+        .chart-scroll-area::-webkit-scrollbar { height: 10px; }
+        .chart-scroll-area::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 5px; }
+        .chart-scroll-area::-webkit-scrollbar-thumb { background: #bdc3c7; border-radius: 5px; }
+        .chart-scroll-area::-webkit-scrollbar-thumb:hover { background: #7f8c8d; }
+
+        /* การแสดงผลบนมือถือ */
+        @media (max-width: 900px) {
+            .left-col { flex: 1 1 100%; max-width: 100%; }
+            .right-col { flex: 1 1 100%; }
+            .chart-wrapper { height: 400px; min-width: 800px; } /* ลดความกว้างขั้นต่ำในมือถือลงนิดหน่อย */
+        }
+    </style>
+</head>
+<body>
+
+<h1>🐾 Smart Pet Feeder & Envoriment</h1>
+
+<div class="main-layout">
+    
+    <div class="left-col">
+        
+        <div class="dashboard">
+            <div class="card">
+                <h3>🌡️ อุณหภูมิ</h3>
+                <div class="value" id="temp">--°C</div>
+                <div id="fanStatus">🌀</div>
+            </div>
+            <div class="card">
+                <h3>🦴 ปริมาณอาหาร</h3>
+                <div class="tank-container">
+                    <div class="tank-level" id="tankLevel"></div>
+                    <div class="tank-text" id="foodText">--%</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>💧 ความชื้น</h3>
+                <div class="value" id="humi">--%</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>แผงควบคุมระบบ</h2>
+            <div class="controls-grid">
+                
+                <div class="control-box">
+                    <h3>🌬️ ควบคุมพัดลม</h3>
+                    <button id="btnFanMode" class="btn btn-green" onclick="toggleFanMode()">โหมด: AUTO</button>
+                    <button id="btnFanPower" class="btn btn-blue disabled" onclick="toggleFanPower()">เปิดพัดลม</button>
+                </div>
+
+                <div class="control-box">
+                    <h3>🦴 ควบคุมอาหาร</h3>
+                    <button id="btnFeedPause" class="btn btn-green" onclick="toggleFeedPause()">ระบบออโต้: ทำงานปกติ</button>
+                    <button id="btnFeedNow" class="btn btn-pink" onclick="feedNow()">ให้อาหารทันที</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>⚙️ ตั้งค่าเกณฑ์ Auto</h3>
+            <div class="setting-row">
+                <span>อุณหภูมิเกิน (พัดลมเปิด):</span>
+                <span><input type="number" id="autoTemp"> °C</span>
+            </div>
+            <div class="setting-row">
+                <span>อาหารต่ำกว่า (เครื่องจ่าย):</span>
+                <span><input type="number" id="autoFood"> %</span>
+            </div>
+            <button class="btn btn-blue" style="margin-top: 10px;" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
+        </div>
+
+    </div>
+
+    <div class="right-col">
+        <div class="chart-container">
+            <h2 style="margin-top: 0; color: #2c3e50; font-size: 18px; border-bottom: 2px solid #eee; padding-bottom: 10px; text-align: left;">📊 กราฟสถิติย้อนหลัง</h2>
+            
+            <div class="chart-scroll-area">
+                <div class="chart-wrapper">
+                    <canvas id="myChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+/* 🔥 ตั้งค่า Firebase ของคุณ */
+const firebaseConfig = {
+    apiKey: "YOUR_FIREBASE_API_KEY",
+    databaseURL: "YOUR_FIREBASE_DB_URL",
+    projectId: "YOUR_FIREBASE_PROJECT_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+firebase.auth().signInAnonymously();
+const db = firebase.database();
+
+let fanMode = "auto";
+let manualFanState = false;
+let feedPause = false;
+
+/* ===== current_status ===== */
+db.ref('current_status').on('value', (s) => {
+    const d = s.val();
+    if (!d) return;
+
+    document.getElementById('temp').innerText = d.temp + " °C";
+    document.getElementById('humi').innerText = d.humi + " %";
+
+    document.getElementById('foodText').innerText = d.food + "%";
+    document.getElementById('tankLevel').style.height = d.food + "%";
+    document.getElementById('tankLevel').style.background = d.food <= 20 ? "#ff4757" : "#f1c40f";
+
+    if (d.fan === true) {
+        fanStatus.style.display = "block";
+        fanStatus.classList.add("spin");
+    } else {
+        fanStatus.style.display = "none";
+        fanStatus.classList.remove("spin");
+    }
+});
+
+/* ===== commands ===== */
+db.ref('commands').on('value', (s) => {
+    const d = s.val() || {};
+    fanMode = d.fan_mode || "auto";
+    manualFanState = d.fan_state || false;
+    feedPause = d.feed_pause || false;
+
+    const btnFanMode = document.getElementById("btnFanMode");
+    const btnFanPower = document.getElementById("btnFanPower");
+
+    if (fanMode === "auto") {
+        btnFanMode.innerText = "โหมดพัดลม: AUTO 🟢";
+        btnFanMode.className = "btn btn-green";
+        btnFanPower.classList.add("disabled"); 
+        btnFanPower.innerText = "พัดลมคุมโดยระบบ Auto";
+        btnFanPower.style.background = "#bdc3c7";
+    } else {
+        btnFanMode.innerText = "โหมดพัดลม: MANUAL 🔵";
+        btnFanMode.className = "btn btn-blue";
+        btnFanPower.classList.remove("disabled"); 
+
+        if (manualFanState) {
+            btnFanPower.innerText = "🌬 ปิดพัดลม (ON อยู่)";
+            btnFanPower.className = "btn btn-red"; 
+        } else {
+            btnFanPower.innerText = "🌬 เปิดพัดลม (OFF อยู่)";
+            btnFanPower.className = "btn btn-blue"; 
+        }
+    }
+
+    const btnFeedPause = document.getElementById("btnFeedPause");
+    if (feedPause) {
+        btnFeedPause.innerText = "ระบบออโต้: ⛔ ระงับอยู่";
+        btnFeedPause.className = "btn btn-orange";
+    } else {
+        btnFeedPause.innerText = "ระบบออโต้: ✅ ทำงานปกติ";
+        btnFeedPause.className = "btn btn-green";
+    }
+});
+
+/* ===== settings ===== */
+db.ref('settings').on('value', (s) => {
+    const d = s.val();
+    if (!d) return;
+    document.getElementById('autoTemp').value = d.auto_temp;
+    document.getElementById('autoFood').value = d.auto_food;
+});
+
+/* ===== Functions ===== */
+function toggleFanMode() { db.ref('commands').update({ fan_mode: fanMode === "auto" ? "manual" : "auto" }); }
+function toggleFanPower() { if (fanMode === "auto") return; db.ref('commands').update({ fan_state: !manualFanState }); }
+function toggleFeedPause() { db.ref('commands').update({ feed_pause: !feedPause }); }
+function feedNow() { db.ref('commands').update({ feed_trigger: true }); }
+
+function saveSettings() {
+    db.ref('settings').update({
+        auto_temp: parseInt(document.getElementById('autoTemp').value),
+        auto_food: parseInt(document.getElementById('autoFood').value)
+    });
+    alert("บันทึกการตั้งค่าเรียบร้อยแล้ว! ✅");
+}
+
+/* ===== Chart ===== */
+Chart.defaults.font.family = "'Kanit', sans-serif";
+const ctx = document.getElementById('myChart').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            { label: 'อุณหภูมิ (°C)', data: [], borderColor: '#ff6b81', backgroundColor: 'rgba(255, 107, 129, 0.1)', fill: true, tension: 0.3 },
+            { label: 'ความชื้น (%)', data: [], borderColor: '#70a1ff', backgroundColor: 'rgba(112, 161, 255, 0.1)', fill: true, tension: 0.3 },
+            { label: 'อาหาร (%)', data: [], borderColor: '#2ed573', backgroundColor: 'rgba(46, 213, 115, 0.1)', fill: true, tension: 0.3 }
+        ]
+    },
+    options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        animation: { duration: 800 }, 
+        plugins: { legend: { position: 'top' } } 
+    }
+});
+
+db.ref('history').limitToLast(288).on('value', (snapshot) => {
+    let labels = [], t = [], h = [], f = [], count = 1;
+    snapshot.forEach(child => {
+        let data = child.val();
+        if (data.timestamp) {
+            labels.push(new Date(data.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }));
+        } else {
+            labels.push(count++);
+        }
+        t.push(data.temp); h.push(data.humi); f.push(data.food);
+    });
+    chart.data.labels = labels; chart.data.datasets[0].data = t; chart.data.datasets[1].data = h; chart.data.datasets[2].data = f; chart.update();
+
+    // บังคับเลื่อน Scrollbar ไปขวาสุด (เวลาปัจจุบัน) เสมอเมื่อมีข้อมูลใหม่
+    setTimeout(() => {
+        const scrollArea = document.querySelector('.chart-scroll-area');
+        scrollArea.scrollLeft = scrollArea.scrollWidth;
+    }, 100);
+});
+</script>
+
+</body>
+</html>
