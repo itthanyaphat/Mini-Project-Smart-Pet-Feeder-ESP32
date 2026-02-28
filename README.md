@@ -32,7 +32,7 @@
 | **Servo Motor**         | `D13`               | PWM Control |
 | **Relay (Fan)**         | `D14`               | สั่งงานแบบ Active LOW |
 | **LED Action**          | `D27`               | ไฟติดเมื่อเซอร์โวทำงาน |
-| **LED WiFi**            | `D2`                | ไฟสีน้ำเงินบนบอร์ด ESP32 |
+| **LED WiFi**            | `D2`                | ไฟสถานะไวไฟบนบอร์ด ESP32 |
 
 ---
 
