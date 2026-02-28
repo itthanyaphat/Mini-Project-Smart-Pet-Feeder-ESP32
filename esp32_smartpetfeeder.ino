@@ -99,7 +99,8 @@ void readSensors() {
 
   long duration = pulseIn(ECHO_PIN, HIGH, 30000); 
   int distance = duration * 0.034 / 2;
-  foodLevel = constrain(map(distance, 21, 13, 0, 100), 0, 100);
+  foodLevel = constrain(map(distance, 21, 13, 0, 100), 0, 100); 
+  // 21 คือความสูงเพดาน 13 คือ ความสูงเพดาน - ความสูงถังอาหาร
 }
 
 void updateFirebaseStatus() {
